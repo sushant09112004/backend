@@ -5,8 +5,12 @@ import morgan from 'morgan';
 import helmet from 'helmet';
 import routes from './routes/index.js';
 import {errorHandler} from "./middlewares/errorHandlers.js";
+import connectDB from './config/db.js';
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+// Connect to MongoDB
+connectDB();
 const allowedOrigins = ['http://localhost:4000', 'https://yourdomain.com'];
 const corsOptions = {
   origin: (origin, callback) => {
