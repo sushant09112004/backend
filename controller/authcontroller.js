@@ -1,7 +1,9 @@
 import User from "../model/user.js";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 
 export const register = async (req, res, next) => {
   try {
