@@ -12,7 +12,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@ai-sdk/google": "^3.0.10",
     "@google/generative-ai": "^0.21.0",
+    "ai": "^6.0.38",
     "bcryptjs": "^3.0.2",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
