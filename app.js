@@ -29,16 +29,21 @@ if (!process.env.GEMINI_API_KEY) {
 // Connect to MongoDB
 connectDB();
 // CORS configuration - allow all origins in development
-const corsOptions = {
-  origin: process.env.NODE_ENV === "production" 
-    ? ["https://yourdomain.com"] 
-    : true, // Allow all origins in development
-  optionsSuccessStatus: 200,
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+// const corsOptions = {
+//   origin: process.env.NODE_ENV === "production" 
+//     ? ["https://yourdomain.com"] 
+//     : true, // Allow all origins in development
+//   optionsSuccessStatus: 200,
+//   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+//   credentials: true,
+//   allowedHeaders: ["Content-Type", "Authorization"],
+// };
+// app.use(cors(corsOptions));
+app.use(cors({
+  origin: true,
   credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-app.use(cors(corsOptions));
+}));
+
 app.use(helmet());
 app.use(morgan("dev"));
 app.use(bodyParser.json());
