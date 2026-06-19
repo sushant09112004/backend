@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import routes from "./routes/index.js";
 import { errorHandler } from "./middlewares/errorHandlers.js";
 import connectDB from "./config/db.js";
+import { GEMINI_API_KEY } from "./config/gemini.js";
 
 // Load environment variables
 dotenv.config();
@@ -15,14 +16,13 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Check for required environment variables
-if (!process.env.GEMINI_API_KEY) {
+if (!GEMINI_API_KEY) {
   console.warn("⚠️  WARNING: GEMINI_API_KEY is not set in environment variables!");
   console.warn("   Resume processing will fail without a valid API key.");
   console.warn("   Please create a .env file with: GEMINI_API_KEY=your_api_key_here");
 } else {
   console.log("✅ GEMINI_API_KEY is configured");
-  // Mask the API key for security (show only first and last few characters)
-  const maskedKey = process.env.GEMINI_API_KEY.substring(0, 10) + "..." + process.env.GEMINI_API_KEY.slice(-4);
+  const maskedKey = GEMINI_API_KEY.substring(0, 10) + "..." + GEMINI_API_KEY.slice(-4);
   console.log(`   API Key: ${maskedKey}`);
 }
 

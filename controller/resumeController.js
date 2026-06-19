@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import { GEMINI_API_KEY, getGeminiModelNames } from "../config/gemini.js";
 
 // Load environment variables at the top of this file
 dotenv.config();
@@ -13,12 +14,11 @@ const __dirname = path.dirname(__filename);
 
 // Initialize Gemini AI - this will be created lazily when needed
 const getGenAI = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (!GEMINI_API_KEY) {
     console.error("GEMINI_API_KEY is not set in environment variables");
     return null;
   }
-  return new GoogleGenerativeAI(apiKey);
+  return new GoogleGenerativeAI(GEMINI_API_KEY);
 };
 
 /**
@@ -50,9 +50,9 @@ export const processResume = async (req, res) => {
     // Use Gemini to extract and structure resume sections
     // Use gemini-1.5-flash as it's the most commonly available and fast model
     // Fallback to gemini-pro if flash is not available
-    const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+    const modelName = getGeminiModelNames()[0];
     console.log(`Using Gemini model: ${modelName}`);
-    console.log(`API Key present: ${process.env.GEMINI_API_KEY ? 'Yes (first 10 chars: ' + process.env.GEMINI_API_KEY.substring(0, 10) + '...)' : 'No'}`);
+    console.log(`API Key present: ${GEMINI_API_KEY ? "Yes (first 10 chars: " + GEMINI_API_KEY.substring(0, 10) + "...)" : "No"}`);
     
     const model = genAI.getGenerativeModel({ model: modelName });
 

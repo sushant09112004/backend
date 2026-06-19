@@ -1,8 +1,40 @@
-import { google } from "@ai-sdk/google";
 import { generateText } from "ai";
+import {
+  GEMINI_API_KEY,
+  createGeminiProvider,
+  getGeminiModelNames,
+} from "../config/gemini.js";
+
+function formatGeminiError(error) {
+  const details = error?.message || String(error);
+
+  if (/quota|rate.?limit|429|exceeded your current quota/i.test(details)) {
+    return {
+      message:
+        "Gemini API quota exceeded. Check billing at https://ai.dev/rate-limit or try again later.",
+      code: "QUOTA_EXCEEDED",
+      details,
+    };
+  }
+
+  if (/not found|not supported/i.test(details)) {
+    return {
+      message:
+        "No available Gemini model responded. Set GEMINI_MODEL in backend/.env to a supported model (e.g. gemini-2.5-flash).",
+      code: "MODEL_NOT_FOUND",
+      details,
+    };
+  }
+
+  return {
+    message: "Failed to generate Gemini response",
+    code: "GEMINI_ERROR",
+    details,
+  };
+}
 
 export const getGemeniResponse = async (req, res) => {
-  let triedModels = []; // ✅ moved OUTSIDE
+  let triedModels = [];
 
   try {
     const { prompt } = req.body;
@@ -14,21 +46,15 @@ export const getGemeniResponse = async (req, res) => {
       });
     }
 
-    const apiKey =
-      process.env.GEMINI_API_KEY ||
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-
-    if (!apiKey) {
+    if (!GEMINI_API_KEY) {
       return res.status(500).json({
         success: false,
         message: "GEMINI_API_KEY not configured",
       });
     }
 
-    const modelNames = [
-      "gemini-2.0-flash",
-      "gemini-2.0-pro",
-    ];
+    const google = createGeminiProvider();
+    const modelNames = getGeminiModelNames();
 
     let responseText;
     let lastError;
@@ -39,7 +65,7 @@ export const getGemeniResponse = async (req, res) => {
         triedModels.push(modelName);
 
         const { text } = await generateText({
-          model: google(modelName, { apiKey }),
+          model: google(modelName),
           prompt: prompt.trim(),
         });
 
@@ -60,14 +86,15 @@ export const getGemeniResponse = async (req, res) => {
       success: true,
       response: responseText.trim(),
     });
-
   } catch (error) {
-    console.error("❌ Gemini API error:", error.message);
+    const formatted = formatGeminiError(error);
+    console.error("❌ Gemini API error:", formatted.details);
 
     res.status(500).json({
       success: false,
-      message: "Failed to generate Gemini response",
-      error: error.message,
+      message: formatted.message,
+      code: formatted.code,
+      error: formatted.details,
       triedModels,
     });
   }
