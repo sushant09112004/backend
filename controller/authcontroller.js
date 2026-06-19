@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
-export const register = async (req, res, next) => {
+export const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
@@ -14,18 +14,20 @@ export const register = async (req, res, next) => {
     }
 
     // Create new user
-    const user = await User.create({
+    const user = new User({
       username,
       email,
       password,
     });
+
+    await user.save();
 
     // Generate token
     const token = jwt.sign({ id: user._id }, JWT_SECRET, {
       expiresIn: "30d",
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       token,
       user: {
@@ -35,11 +37,16 @@ export const register = async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(error);
+    console.error("Auth register error:", error);
+    const statusCode = error.code === 11000 ? 400 : 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.code === 11000 ? "User already exists" : error.message || "Internal Server Error",
+    });
   }
 };
 
-export const login = async (req, res, next) => {
+export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -60,7 +67,7 @@ export const login = async (req, res, next) => {
       expiresIn: "30d",
     });
 
-    res.json({
+    return res.json({
       success: true,
       token,
       user: {
@@ -70,6 +77,10 @@ export const login = async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(error);
+    console.error("Auth login error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
   }
 };
