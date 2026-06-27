@@ -1,6 +1,10 @@
+import dns from "node:dns";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 dotenv.config();
+
+// Set public DNS servers to resolve MongoDB SRV records reliably and prevent querySrv ECONNREFUSED errors
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const connectDb = async () => {
     try {
