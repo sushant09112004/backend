@@ -118,3 +118,71 @@ export const loginHR = async (req, res) => {
     });
   }
 };
+
+export const getCurrentHR = async (req, res) => {
+  try {
+    if (!req.hr) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const hr = await HR.findById(req.hr._id).select("-password");
+
+    if (!hr) {
+      return res.status(404).json({ message: "HR profile not found" });
+    }
+
+    return res.json({
+      success: true,
+      hr: {
+        id: hr._id,
+        username: hr.username,
+        generatedemail: hr.generatedemail,
+        role: hr.role,
+      },
+    });
+  } catch (error) {
+    console.error("Get current HR error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
+export const changeHRPassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!req.hr) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Both current and new passwords are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters long" });
+    }
+
+    const hr = await HR.findById(req.hr._id);
+
+    if (!hr) {
+      return res.status(404).json({ message: "HR profile not found" });
+    }
+
+    const isMatch = await hr.matchPassword(currentPassword);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    hr.password = newPassword;
+    await hr.save();
+
+    return res.json({ success: true, message: "Password updated successfully" });
+  } catch (error) {
+    console.error("Change HR password error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Internal Server Error" });
+  }
+};
