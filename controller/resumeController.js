@@ -1,9 +1,8 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import pdfParse from "pdf-parse";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import pdfParse from "pdf-parse";
 import { GEMINI_API_KEY, getGeminiModelNames } from "../config/gemini.js";
 
 // Load environment variables at the top of this file
@@ -12,14 +11,8 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Gemini AI - this will be created lazily when needed
-const getGenAI = () => {
-  if (!GEMINI_API_KEY) {
-    console.error("GEMINI_API_KEY is not set in environment variables");
-    return null;
-  }
-  return new GoogleGenerativeAI(GEMINI_API_KEY);
-};
+const OPENAI_KEY = process.env.OPENAI_KEY || process.env.OPENAI_API_KEY;
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-3.5-turbo";
 
 /**
  * Extract text from PDF and process with Gemini to create structured sections
@@ -33,28 +26,17 @@ export const processResume = async (req, res) => {
     const { jobDescription } = req.body;
     const pdfPath = req.file.path;
 
-    // Check if API key is configured and get Gemini AI instance
-    const genAI = getGenAI();
-    if (!genAI) {
-      return res.status(500).json({
-        error: "Gemini API key not configured",
-        message: "Please set GEMINI_API_KEY in your .env file. Make sure the .env file is in the backend/ directory and the server has been restarted."
-      });
-    }
-
     // Read and parse PDF
     const pdfBuffer = fs.readFileSync(pdfPath);
     const pdfData = await pdfParse(pdfBuffer);
     const extractedText = pdfData.text;
 
-    // Use Gemini to extract and structure resume sections
-    // Use gemini-1.5-flash as it's the most commonly available and fast model
-    // Fallback to gemini-pro if flash is not available
-    const modelName = getGeminiModelNames()[0];
-    console.log(`Using Gemini model: ${modelName}`);
-    console.log(`API Key present: ${GEMINI_API_KEY ? "Yes (first 10 chars: " + GEMINI_API_KEY.substring(0, 10) + "...)" : "No"}`);
-    
-    const model = genAI.getGenerativeModel({ model: modelName });
+    if (!OPENAI_KEY) {
+      return res.status(500).json({
+        error: "OpenAI API key not configured",
+        message: "Please set OPENAI_KEY in your .env file. Make sure the .env file is in the backend/ directory and the server has been restarted."
+      });
+    }
 
     const prompt = `You are a resume parser. Extract and structure the following resume text into organized sections. 
     Return a JSON object with the following structure:
@@ -106,25 +88,107 @@ export const processResume = async (req, res) => {
 
     Return ONLY valid JSON, no additional text.`;
 
+    const extractJsonText = (text) => {
+      if (typeof text !== "string") return "";
+
+      const cleaned = text
+        .replace(/```json\s*/g, "")
+        .replace(/```/g, "")
+        .replace(/[“”]/g, '"')
+        .trim();
+
+      const startIndex = cleaned.indexOf("{");
+      if (startIndex === -1) {
+        return cleaned;
+      }
+
+      let depth = 0;
+      for (let i = startIndex; i < cleaned.length; i += 1) {
+        const char = cleaned[i];
+        if (char === "{") depth += 1;
+        if (char === "}") depth -= 1;
+        if (depth === 0) {
+          return cleaned.slice(startIndex, i + 1).trim();
+        }
+      }
+
+      return cleaned.slice(startIndex).trim();
+    };
+
+    const cleanJsonResponse = (text) => {
+      let jsonText = extractJsonText(text);
+
+      jsonText = jsonText
+        .replace(/,\s*([\]}])/g, "$1")
+        .replace(/([{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
+        .replace(/:\s*'([^']*?)'/g, ': "$1"')
+        .replace(/([\[{,]\s*)([A-Za-z0-9_]+)\s*:/g, '$1"$2":')
+        .replace(/\r?\n/g, " ")
+        .trim();
+
+      return jsonText;
+    };
+
+    const parseJsonString = (jsonText) => {
+      try {
+        return JSON.parse(jsonText);
+      } catch (parseError) {
+        const cleaned = cleanJsonResponse(jsonText);
+        try {
+          return JSON.parse(cleaned);
+        } catch (secondError) {
+          try {
+            return new Function(`return (${cleaned})`)();
+          } catch (fallbackError) {
+            throw new Error(
+              `Invalid JSON response from OpenAI. Parsing failed: ${parseError.message}`
+            );
+          }
+        }
+      }
+    };
+
     let resumeData;
     
     try {
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      
-      // Extract JSON from response
-      const text = response.text();
-      // Remove markdown code blocks if present
-      const jsonText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      resumeData = JSON.parse(jsonText);
+      const payload = {
+        model: OPENAI_MODEL,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 2000,
+        temperature: 0.1,
+      };
+
+      const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENAI_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        console.error("OpenAI API error:", data);
+        if (data?.error?.message) {
+          throw new Error(data.error.message);
+        }
+        throw new Error("OpenAI API returned an error");
+      }
+
+      const text = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text;
+      const jsonText = cleanJsonResponse(String(text || ""));
+
+      resumeData = parseJsonString(jsonText);
     } catch (apiError) {
-      console.error("Error calling Gemini API:", apiError);
-      
+      console.error("Error calling OpenAI API:", apiError);
+
       // If API call fails, provide a more helpful error message
       if (apiError.message?.includes("API key") || apiError.status === 400) {
-        throw new Error("Invalid or missing Gemini API key. Please check your .env file and ensure GEMINI_API_KEY is set correctly.");
+        throw new Error("Invalid or missing OpenAI API key. Please check your .env file and ensure OPENAI_KEY is set correctly.");
       }
-      
+
       // Fallback: create basic structure from extracted text
       console.log("Using fallback: creating basic structure from extracted text");
       resumeData = {
@@ -174,7 +238,7 @@ export const processResume = async (req, res) => {
     // Provide more specific error messages
     let errorMessage = error.message;
     if (error.message?.includes("API key")) {
-      errorMessage = "Invalid Gemini API key. Please check your .env file and ensure GEMINI_API_KEY is set correctly. You can get a new key from https://makersuite.google.com/app/apikey";
+      errorMessage = "Invalid OpenAI API key. Please check your .env file and ensure OPENAI_KEY is set correctly.";
     }
 
     res.status(500).json({
