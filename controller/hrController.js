@@ -3,16 +3,21 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
-const buildGeneratedEmail = (username) =>
-  `${username.trim().toLowerCase()}@resumesync.email.com`;
-
 export const registerHR = async (req, res) => {
   try {
     console.log('HR register called', { body: req.body });
-    const { username, password } = req.body;
+    const { name, company, email, password } = req.body;
 
-    if (!username?.trim()) {
-      return res.status(400).json({ message: "Username is required" });
+    if (!name?.trim()) {
+      return res.status(400).json({ message: "Name is required" });
+    }
+
+    if (!company?.trim()) {
+      return res.status(400).json({ message: "Company is required" });
+    }
+
+    if (!email?.trim()) {
+      return res.status(400).json({ message: "Email is required" });
     }
 
     if (!password || password.length < 6) {
@@ -21,25 +26,24 @@ export const registerHR = async (req, res) => {
         .json({ message: "Password must be at least 6 characters long" });
     }
 
-    const normalizedUsername = username.trim().toLowerCase();
-    const generatedemail = buildGeneratedEmail(normalizedUsername);
+    const normalizedEmail = email.trim().toLowerCase();
 
-    const hrExists = await HR.findOne({
-      $or: [{ username: normalizedUsername }, { generatedemail }],
-    });
+    const hrExists = await HR.findOne({ email: normalizedEmail });
 
     if (hrExists) {
       return res.status(400).json({ message: "HR account already exists" });
     }
 
     const hr = new HR({
-      username: normalizedUsername,
+      name: name.trim(),
+      company: company.trim(),
+      email: normalizedEmail,
       password,
-      generatedemail,
       role: "hr",
+      status: "Active",
     });
 
-    console.log('Saving HR', { username: normalizedUsername, generatedemail });
+    console.log('Saving HR', { name: hr.name, company: hr.company, email: hr.email });
     await hr.save();
     console.log('HR saved', hr._id);
 
@@ -52,9 +56,11 @@ export const registerHR = async (req, res) => {
       token,
       user: {
         id: hr._id,
-        username: hr.username,
-        generatedemail: hr.generatedemail,
+        name: hr.name,
+        company: hr.company,
+        email: hr.email,
         role: hr.role,
+        status: hr.status,
       },
     });
   } catch (error) {
@@ -78,13 +84,14 @@ export const registerHR = async (req, res) => {
 
 export const loginHR = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, email, password } = req.body;
+    const identifier = (email || username || "").trim().toLowerCase();
 
-    if (!username?.trim() || !password) {
-      return res.status(400).json({ message: "Username and password are required" });
+    if (!identifier || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const hr = await HR.findOne({ username: username.trim().toLowerCase() });
+    const hr = await HR.findOne({ email: identifier });
 
     if (!hr) {
       return res.status(401).json({ message: "Invalid credentials" });
@@ -105,9 +112,11 @@ export const loginHR = async (req, res) => {
       token,
       user: {
         id: hr._id,
-        username: hr.username,
-        generatedemail: hr.generatedemail,
+        name: hr.name,
+        company: hr.company,
+        email: hr.email,
         role: hr.role,
+        status: hr.status,
       },
     });
   } catch (error) {
@@ -135,9 +144,11 @@ export const getCurrentHR = async (req, res) => {
       success: true,
       hr: {
         id: hr._id,
-        username: hr.username,
-        generatedemail: hr.generatedemail,
+        name: hr.name,
+        company: hr.company,
+        email: hr.email,
         role: hr.role,
+        status: hr.status,
       },
     });
   } catch (error) {

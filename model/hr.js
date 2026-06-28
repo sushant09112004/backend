@@ -2,9 +2,19 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
 const hrSchema = new mongoose.Schema({
-  username: {
+  name: {
     type: String,
-    required: [true, "Username is required"],
+    required: [true, "Name is required"],
+    trim: true,
+  },
+  company: {
+    type: String,
+    required: [true, "Company is required"],
+    trim: true,
+  },
+  email: {
+    type: String,
+    required: [true, "Email is required"],
     unique: true,
     trim: true,
     lowercase: true,
@@ -14,16 +24,15 @@ const hrSchema = new mongoose.Schema({
     required: [true, "Password is required"],
     minlength: [6, "Password must be at least 6 characters long"],
   },
-  generatedemail: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-  },
   role: {
     type: String,
     default: "hr",
     enum: ["hr"],
+  },
+  status: {
+    type: String,
+    default: "Active",
+    enum: ["Active", "Inactive"],
   },
   createdAt: {
     type: Date,
