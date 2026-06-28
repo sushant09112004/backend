@@ -5,6 +5,7 @@ import pdfRoutes from "./pdf.js";
 import gemeniRoutes from "./gemeni.js";
 import historyRoutes from "./history.js";
 import hrRoutes from "./hr.js";
+import roastRoutes from "./roast.js";
 const router = express.Router();
 
 router.get("/", (req, res) => {
@@ -17,6 +18,7 @@ router.use("/pdf", pdfRoutes);
 router.use("/gemeni", gemeniRoutes);
 router.use("/history", historyRoutes);
 router.use("/hr", hrRoutes);
+router.use("/roast", roastRoutes);
 
 console.log("✅ All routes registered:");
 console.log("   - /api/resume");
@@ -25,5 +27,6 @@ console.log("   - /api/pdf");
 console.log("   - /api/gemeni");
 console.log("   - /api/history");
 console.log("   - /api/hr");
+console.log("   - /api/roast");
 
 export default router;
