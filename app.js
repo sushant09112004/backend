@@ -49,6 +49,30 @@ app.use(morgan("dev"));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use("/api", routes);
+// Debug: list registered routes under /api
+const listRoutes = (r) => {
+  try {
+    const stack = r.stack || (r._router && r._router.stack) || []
+    const routes = []
+    stack.forEach((layer) => {
+      if (layer.route && layer.route.path) {
+        const methods = Object.keys(layer.route.methods).join(',').toUpperCase()
+        routes.push(`${methods} ${layer.route.path}`)
+      } else if (layer.name === 'router' && layer.handle && layer.handle.stack) {
+        layer.handle.stack.forEach((l) => {
+          if (l.route && l.route.path) {
+            const methods = Object.keys(l.route.methods).join(',').toUpperCase()
+            routes.push(`${methods} ${l.route.path}`)
+          }
+        })
+      }
+    })
+    console.log('Registered API routes:\n', routes.join('\n'))
+  } catch (e) {
+    console.warn('Failed to list routes', e)
+  }
+}
+listRoutes(routes)
 app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
